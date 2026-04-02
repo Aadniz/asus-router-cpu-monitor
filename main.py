@@ -11,8 +11,11 @@ import re
 import json
 import time
 
+from style import draw_data, print_data
+from colors import terminal_colors
+
 VALID_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
-VALID_ASUS_TOKEN = "ctKWXmJW9inW5bP9dQQqB6a9VPp9Hq0"
+VALID_ASUS_TOKEN = "pnH6K1ShGfcsWy1WorhtxWVIJ0uZXU0"
 
 
 def extract_variable_backwards(content: str) -> str|None:
@@ -56,10 +59,13 @@ def extract_jsons(content) -> dict:
     return data
 
 
-#proxy = input("Plz enter socks proxy floof: ")
+#proxy = input("Enter socks proxy (if any): ")
 proxy = "127.0.0.1:2522"
-#host = input("Plz enter host floof: ")
+#host = input("Enter host: ")
 host = "192.168.1.1"
+
+# drawn | print | graph
+style = "drawn"
 
 proxies = {
     "http": f"socks5h://{proxy}",
@@ -97,9 +103,19 @@ cookies = {
 cpu_info_old = []
 
 while True:
-    r = requests.get(f"http://{host}/cpu_ram_status.asp?_={int(time.time() * 1000)}", proxies=proxies, cookies=cookies, headers=headers)
+    if proxy == "":
+        proxies = None
+    try:
+        r = requests.get(f"http://{host}/cpu_ram_status.asp?_={int(time.time() * 1000)}", proxies=proxies, cookies=cookies, headers=headers, timeout=1)
+    except requests.exceptions.Timeout:
+        if style == "drawn":
+            print(terminal_colors.fg.red + "!" + terminal_colors.reset, end="")
+        elif style == "print":
+            print("Timeout..")
+        continue
     content = extract_jsons(r.text)
     
+    data = {}
 
     percentage = total_diff = usage_diff = 0
     length = len(content["cpuInfo"].keys())
@@ -113,12 +129,20 @@ while True:
         pt = ""
         total_diff = 0 if cpu_info_old[i]["total"] == 0 else int(content["cpuInfo"][f"cpu{i}"]["total"]) - int(cpu_info_old[i]["total"])
         usage_diff = 0 if cpu_info_old[i]["usage"] == 0 else int(content["cpuInfo"][f"cpu{i}"]["usage"]) - int(cpu_info_old[i]["usage"])
-        percentage = '{0:.2f}'.format(0 if total_diff == 0.00 else float(100*usage_diff/total_diff));
+        percentage = 0 if total_diff == 0.00 else float(100*usage_diff/total_diff)
         cpu_info_old[i]["total"] = int(content["cpuInfo"][f"cpu{i}"]["total"])
         cpu_info_old[i]["usage"] = int(content["cpuInfo"][f"cpu{i}"]["usage"])
-        print(f"cpu{i}: {percentage}%", end=" ")
+        data[f"cpu{i}"] = percentage
     
+    percentage = float(content['memInfo']['used']) / float(content['memInfo']['total']) * 100
+    data["mem"] = percentage
+
+    if style == "drawn":
+        draw_data(data)
+    elif style == "print":
+        print_data(data)
+    elif style == "graph":
+        exit(1)
+        
     
-    percentage = '{0:.2f}'.format(float(content['memInfo']['used']) / float(content['memInfo']['total']) * 100)
-    print(f"mem: {percentage}%")
     time.sleep(1)
