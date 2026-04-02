@@ -73,14 +73,52 @@ cookies = {
 }
 
 
+# From Asus's source code:
+# var pt = "";
+# var percentage = total_diff = usage_diff = 0;
+# var length = Object.keys(cpu_info_new).length;
+# for(i=0;i<length;i++){
+#   pt = "";
+#   total_diff = (cpu_info_old[i].total == 0)? 0 : (cpu_info_new["cpu"+i].total - cpu_info_old[i].total);
+#   usage_diff = (cpu_info_old[i].usage == 0)? 0 : (cpu_info_new["cpu"+i].usage - cpu_info_old[i].usage);
+#   percentage = (total_diff == 0) ? 0 : parseInt(100*usage_diff/total_diff);
+#   $("#cpu"+i+"_bar").css("width", percentage +"%");
+#   $("#cpu"+i+"_quantification").html(percentage +"%");
+#   cpu_usage_array[i].push(100 - percentage);
+#   cpu_usage_array[i].splice(0,1);
+#   for(j=0;j<array_size;j++){
+#     pt += j*6 +","+ cpu_usage_array[i][j] + " ";
+#   }
+#   document.getElementById('cpu'+i+'_graph').setAttribute('points', pt);
+#   cpu_info_old[i].total = cpu_info_new["cpu"+i].total;
+#   cpu_info_old[i].usage = cpu_info_new["cpu"+i].usage;
+# }
+
+cpu_info_old = []
+
 while True:
     r = requests.get(f"http://{host}/cpu_ram_status.asp?_={int(time.time() * 1000)}", proxies=proxies, cookies=cookies, headers=headers)
     content = extract_jsons(r.text)
     
-    cpus = list(content["cpuInfo"].keys())
-    for cpu in cpus:
-        percentage = '{0:.2f}'.format(float(content["cpuInfo"][cpu]["usage"]) / float(content["cpuInfo"][cpu]["total"]) * 100)
-        print(f"{cpu}: {percentage}%", end=" ")
+
+    percentage = total_diff = usage_diff = 0
+    length = len(content["cpuInfo"].keys())
+    for i in range(length):
+        # Esnure cpu_info_old is set
+        if i >= len(cpu_info_old):
+            cpu_info_old.append({
+                "total": 0,
+                "usage": 0
+            })
+        pt = ""
+        total_diff = 0 if cpu_info_old[i]["total"] == 0 else int(content["cpuInfo"][f"cpu{i}"]["total"]) - int(cpu_info_old[i]["total"])
+        usage_diff = 0 if cpu_info_old[i]["usage"] == 0 else int(content["cpuInfo"][f"cpu{i}"]["usage"]) - int(cpu_info_old[i]["usage"])
+        percentage = '{0:.2f}'.format(0 if total_diff == 0.00 else float(100*usage_diff/total_diff));
+        cpu_info_old[i]["total"] = int(content["cpuInfo"][f"cpu{i}"]["total"])
+        cpu_info_old[i]["usage"] = int(content["cpuInfo"][f"cpu{i}"]["usage"])
+        print(f"cpu{i}: {percentage}%", end=" ")
+    
+    
     percentage = '{0:.2f}'.format(float(content['memInfo']['used']) / float(content['memInfo']['total']) * 100)
     print(f"mem: {percentage}%")
     time.sleep(1)
