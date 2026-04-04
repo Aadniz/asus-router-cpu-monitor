@@ -11,6 +11,10 @@ Inspired by prettyping, easier to visualize if the CPUs are overloaded.
 It communicates with Asus's web dashboard under the hood, calling .asp and .cgi routes.
 Maybe a more elegant solution could be to communicate with the router over SSH instead.
 
+## Troubleshooting
+
+One quick tip to reset all the cache is just to remove the file called `.cached_details.json` located in the same directory as the script.
+
 ## Known issues
 
 ### Multiple sessions

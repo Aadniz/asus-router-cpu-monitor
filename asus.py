@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
+import base64
+import json
 import os
 import requests
 import time
-import base64
 from getpass import getpass
 
 from utils import extract_jsons
@@ -17,11 +18,13 @@ class SessionExpiredException(Exception):
 
 
 class Asus:
-    host: str | None = "192.168.1.1:80"
+    host: str | None = None
     proxy: str | None = None
     configured: bool = False
+    __cached_asus_details_path: str = os.path.dirname(os.path.realpath(__file__)) + "/.cached_details.json"
     __asus_token: str | None = None
-    __cached_asus_token_path: str = os.path.dirname(os.path.realpath(__file__)) + "/.cached_token"
+    __default_host: str | None = "192.168.1.1"
+    __default_proxy: str | None = None
 
     __cpu_info_old = []
 
@@ -29,12 +32,18 @@ class Asus:
         self.__load_cached_token()
 
     def configure(self):
-        proxy = input("Enter socks proxy (default: None): ")
-        if proxy != "":
+        
+        proxy = input(f"Enter socks proxy (default: {self.__default_proxy}): ")
+        if proxy == "":
+            self.proxy = self.__default_proxy
+        else:
             self.proxy = proxy
-        host = input("Enter host (default: 192.168.1.1:80): ")
-        if host != "":
+        host = input(f"Enter host (default: {self.__default_host}): ")
+        if host == "":
+            self.host = self.__default_host
+        else:
             self.host = host
+        self.__cache_details({'host': self.host, 'proxy': self.proxy})
         self.configured = True
     
     def login(self):
@@ -47,27 +56,47 @@ class Asus:
         payload = {
             'login_authorization': base64.b64encode((f"{username}:{password}").encode())
         }
-        r = requests.post(f"http://{self.host}/login.cgi", headers=headers, data=payload, timeout=5)
+        proxies = self.__get_socks_proxies()
+        r = requests.post(f"http://{self.host}/login.cgi", headers=headers, data=payload, proxies=proxies, timeout=5)
         asus_token = r.cookies.get("asus_token")
 
         if not asus_token:
             return False
 
         self.__asus_token = asus_token
-        self.__cache_token()
+        self.__cache_details({'token': asus_token})
         return True
 
-    def __cache_token(self):
-        if not self.__asus_token:
-            return
-
-        with open(self.__cached_asus_token_path, "w") as f:
-            f.write(self.__asus_token)
+    def __cache_details(self, details: dict):
+        data = None
+        if os.path.isfile(self.__cached_asus_details_path):
+            with open(self.__cached_asus_details_path, "r") as f:
+                data = f.read()
+        if data:
+            json_data = json.loads(data)
+        else:
+            json_data = {}
+            
+            
+        with open(self.__cached_asus_details_path, "w") as f:
+            for key in details.keys():
+                json_data[key] = details[key]
+            f.write(json.dumps(json_data))
 
     def __load_cached_token(self):
-        if os.path.isfile(self.__cached_asus_token_path):
-            file = open(self.__cached_asus_token_path, "r")
-            self.__asus_token = file.read()
+        if os.path.isfile(self.__cached_asus_details_path):
+            file = open(self.__cached_asus_details_path, "r")
+            content = file.read()
+            json_content = json.loads(content)
+            token = json_content.get("token")
+            if token:
+                self.__asus_token = token
+            host = json_content.get("host")
+            if host:
+                self.__default_host = host
+            proxy = json_content.get("proxy")
+            if proxy:
+                self.__default_proxy = proxy
     
     def __get_socks_proxies(self):
         if not self.proxy:
@@ -137,5 +166,3 @@ class Asus:
         data["mem"] = percentage
         return data
 
-    def __token_expired(self):
-        pass
