@@ -16,6 +16,8 @@ while True:
     # Caches the config and sign in details under the hood
     if not asus.configured:
         asus.configure()
+
+    time.sleep(1)
     try:
         data = asus.get_cpu_memory()
     except requests.exceptions.Timeout:
@@ -23,6 +25,12 @@ while True:
             print(terminal_colors.fg.red + "!" + terminal_colors.reset, end="")
         elif style == "print":
             print("Timeout..")
+        continue
+    except requests.exceptions.ConnectionError:
+        if style == "drawn":
+            print(terminal_colors.fg.red + "!" + terminal_colors.reset, end="")
+        elif style == "print":
+            print("Connection error..")
         continue
     except SessionExpiredException:
         print("Login token expired, you need to sign in again")
@@ -36,5 +44,3 @@ while True:
     elif style == "graph":
         exit(1)
         
-    
-    time.sleep(1)
